@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "auth-helper-functions",
   "version": "1.0.0",
   "description": "Netlify functions for PlayFab auth helper",
