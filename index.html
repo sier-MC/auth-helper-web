@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Vinculando Cuenta...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; background-color: #222; color: #eee; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; text-align: center; }
+        h2 { font-weight: normal; }
+    </style>
+</head>
+<body>
+    <h2 id="status">Por favor, espera...</h2>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+        // Esta función se ejecuta cuando la página carga
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const deviceId = urlParams.get('deviceId');
+
+            if (!deviceId) {
+                document.getElementById('status').innerText = "Error: Falta el ID del dispositivo.";
+                return;
+            }
+
+            // Inicializamos el cliente de Google
+            const client = google.accounts.oauth2.initCodeClient({
+                client_id: "136831675697-g752dn6minj6b3ippc5c574se1tceuti.apps.googleusercontent.com", // Tu Web Client ID
+                scope: 'email profile openid',
+                callback: (response) => {
+                    if (response.code) {
+                        // Tenemos el código, ahora se lo enviamos a nuestro mini-servidor
+                        document.getElementById('status').innerText = "Verificando con el servidor...";
+                        fetch('/.netlify/functions/link-playfab-account', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                serverAuthCode: response.code,
+                                deviceId: deviceId
+                            })
+                        })
+                        .then(res => {
+                            if (!res.ok) {
+                                // Si la respuesta del servidor no es exitosa, leemos el error
+                                return res.json().then(err => { throw new Error(err.error || "Error desconocido del servidor") });
+                            }
+                            return res.json();
+                        })
+                        .then(data => {
+                            if (data.success) {
+                                document.getElementById('status').innerText = "¡Éxito! Tu cuenta ha sido vinculada. Ya puedes cerrar esta ventana y volver al juego.";
+                            } else {
+                                // Este 'else' es por si el servidor devuelve success:false pero con un status 200
+                                document.getElementById('status').innerText = "Error en el servidor: " + (data.error || "Respuesta inesperada.");
+                            }
+                        })
+                        .catch(err => {
+                            document.getElementById('status').innerText = "Error de conexión con el servidor: " + err.message;
+                        });
+                    } else {
+                        document.getElementById('status').innerText = "El inicio de sesión con Google ha fallado o ha sido cancelado. Puedes cerrar esta ventana.";
+                    }
+                }
+            });
+
+            // Pedimos el código
+            document.getElementById('status').innerText = "Por favor, inicia sesión con Google para vincular tu cuenta...";
+            client.requestCode();
+        };
+    </script>
+</body>
+</html>

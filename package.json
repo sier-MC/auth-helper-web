@@ -1,0 +1,8 @@
+﻿{
+  "name": "auth-helper-functions",
+  "version": "1.0.0",
+  "description": "Netlify functions for PlayFab auth helper",
+  "dependencies": {
+    "playfab-sdk": "^2.113.230815"
+  }
+}
