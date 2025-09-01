@@ -1,5 +1,5 @@
 // Archivo: netlify/functions/link-playfab-account.js
-// VERSIÓN FINAL DEFINITIVA
+// VERSIÓN FINAL CON EL MÉTODO DE LOGIN CORRECTO
 
 var PlayFab = require('playfab-sdk');
 var PlayFabServer = PlayFab.PlayFabServer;
@@ -21,16 +21,17 @@ exports.handler = async function(event, context) {
         return { statusCode: 400, body: JSON.stringify({ success: false, error: "Missing serverAuthCode or deviceId." }) };
     }
     
-    // Usamos LoginWithCustomID porque el DeviceID que nos llega del cliente es un CustomID para el servidor.
+    // CAMBIO CLAVE: Usamos LoginWithAndroidDeviceID para ser consistentes con el cliente.
     const loginRequest = {
         TitleId: PLAYFAB_TITLE_ID,
-        CustomId: deviceId, 
-        CreateAccount: true // <--- ¡¡ESTE ES EL CAMBIO CLAVE!!
+        AndroidDeviceId: deviceId, // <--- CAMBIADO DE CustomId A AndroidDeviceId
+        CreateAccount: true
     };
 
     try {
         const loginResponse = await new Promise((resolve, reject) => {
-            PlayFabServer.LoginWithCustomID(loginRequest, (result, error) => {
+            // CAMBIADO DE LoginWithCustomID A LoginWithAndroidDeviceID
+            PlayFabServer.LoginWithAndroidDeviceID(loginRequest, (result, error) => {
                 if (error) reject(error);
                 else resolve(result);
             });
@@ -38,7 +39,7 @@ exports.handler = async function(event, context) {
         
         const playFabId = loginResponse.data.PlayFabId;
 
-        // Vincular la cuenta de Google a ese PlayFabID
+        // Ahora que la sesión es consistente, la vinculación funcionará.
         const linkRequest = {
             PlayFabId: playFabId,
             ServerAuthCode: serverAuthCode,
