@@ -1,13 +1,17 @@
-﻿// Archivo: netlify/functions/link-playfab-account.js
-const PlayFab = require("playfab-sdk/Scripts/PlayFab/PlayFab.js");
-const PlayFabServer = require("playfab-sdk/Scripts/PlayFab/PlayFabServer.js");
+// Archivo: netlify/functions/link-playfab-account.js
+// VERSIÓN CORREGIDA
 
-// Configura tus claves de PlayFab (las pondremos en Netlify más tarde)
+// La forma correcta de importar el SDK de PlayFab en Node.js
+var PlayFab = require('playfab-sdk');
+var PlayFabServer = PlayFab.PlayFabServer;
+
+// Configura tus claves de PlayFab (las coge de Netlify)
 const PLAYFAB_TITLE_ID = process.env.PLAYFAB_TITLE_ID;
 const PLAYFAB_SECRET_KEY = process.env.PLAYFAB_SECRET_KEY;
 
-PlayFab.PlayFabServer.settings.titleId = PLAYFAB_TITLE_ID;
-PlayFab.PlayFabServer.settings.developerSecretKey = PLAYFAB_SECRET_KEY;
+// La forma correcta de configurar las claves
+PlayFabServer.settings.titleId = PLAYFAB_TITLE_ID;
+PlayFabServer.settings.developerSecretKey = PLAYFAB_SECRET_KEY;
 
 exports.handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {
@@ -20,7 +24,7 @@ exports.handler = async function(event, context) {
         return { statusCode: 400, body: JSON.stringify({ success: false, error: "Missing serverAuthCode or deviceId." }) };
     }
     
-    // Usaremos CustomId para el login del servidor, es más genérico
+    // Usamos LoginWithCustomID porque el DeviceID que nos llega del cliente es, en efecto, un CustomID para el servidor.
     const loginRequest = {
         TitleId: PLAYFAB_TITLE_ID,
         CustomId: deviceId, 
@@ -29,7 +33,7 @@ exports.handler = async function(event, context) {
 
     try {
         const loginResponse = await new Promise((resolve, reject) => {
-            PlayFab.PlayFabServer.LoginWithCustomID(loginRequest, (result, error) => {
+            PlayFabServer.LoginWithCustomID(loginRequest, (result, error) => {
                 if (error) reject(error);
                 else resolve(result);
             });
@@ -45,7 +49,7 @@ exports.handler = async function(event, context) {
         };
 
         await new Promise((resolve, reject) => {
-            PlayFab.PlayFabServer.LinkGoogleAccount(linkRequest, (result, error) => {
+            PlayFabServer.LinkGoogleAccount(linkRequest, (result, error) => {
                 if (error) reject(error);
                 else resolve(result);
             });
@@ -59,7 +63,7 @@ exports.handler = async function(event, context) {
     } catch (error) {
         return {
             statusCode: 500,
-            body: JSON.stringify({ success: false, error: error.errorMessage || "An unknown error occurred." })
+            body: JSON.stringify({ success: false, error: error.errorMessage || "An unknown server error occurred." })
         };
     }
 };
