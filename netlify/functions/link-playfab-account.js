@@ -1,5 +1,5 @@
 // Archivo: netlify/functions/link-playfab-account.js
-// VERSIÓN FINAL CON EL MÉTODO DE LOGIN CORRECTO
+// VERSIÓN FINAL CON LÓGICA INVERTIDA
 
 var PlayFab = require('playfab-sdk');
 var PlayFabServer = PlayFab.PlayFabServer;
@@ -20,34 +20,45 @@ exports.handler = async function(event, context) {
     if (!serverAuthCode || !deviceId) {
         return { statusCode: 400, body: JSON.stringify({ success: false, error: "Missing serverAuthCode or deviceId." }) };
     }
-    
-    // CAMBIO CLAVE: Usamos LoginWithAndroidDeviceID para ser consistentes con el cliente.
-    const loginRequest = {
-        TitleId: PLAYFAB_TITLE_ID,
-        AndroidDeviceId: deviceId, // <--- CAMBIADO DE CustomId A AndroidDeviceId
-        CreateAccount: true
-    };
 
     try {
+        // PASO 1: Iniciar sesión con Google para crear/obtener la cuenta maestra.
+        const googleLoginRequest = {
+            TitleId: PLAYFAB_TITLE_ID,
+            ServerAuthCode: serverAuthCode,
+            CreateAccount: true
+        };
+
         const loginResponse = await new Promise((resolve, reject) => {
-            // CAMBIADO DE LoginWithCustomID A LoginWithAndroidDeviceID
-            PlayFabServer.LoginWithAndroidDeviceID(loginRequest, (result, error) => {
+            PlayFabServer.LoginWithGoogleAccount(googleLoginRequest, (result, error) => {
                 if (error) reject(error);
                 else resolve(result);
             });
         });
-        
-        const playFabId = loginResponse.data.PlayFabId;
 
-        // Ahora que la sesión es consistente, la vinculación funcionará.
+        const playFabId = loginResponse.data.PlayFabId;
+        const sessionTicket = loginResponse.data.SessionTicket;
+
+        // PASO 2: Vincular el DeviceID a la cuenta maestra recién logueada.
         const linkRequest = {
             PlayFabId: playFabId,
-            ServerAuthCode: serverAuthCode,
+            AndroidDeviceId: deviceId,
             ForceLink: true
         };
-
+        
+        // Para esta llamada, necesitamos autenticarnos como el propio jugador
+        // usando el SessionTicket que acabamos de obtener.
+        const customPlayFabClient = {
+            settings: {
+                titleId: PLAYFAB_TITLE_ID
+            },
+            ClientApi: PlayFab.PlayFabClient
+        };
+        
         await new Promise((resolve, reject) => {
-            PlayFabServer.LinkGoogleAccount(linkRequest, (result, error) => {
+            customPlayFabClient.ClientApi.LinkAndroidDeviceID(linkRequest, {
+                "X-Authorization": sessionTicket
+            }, (result, error) => {
                 if (error) reject(error);
                 else resolve(result);
             });
@@ -55,7 +66,7 @@ exports.handler = async function(event, context) {
 
         return {
             statusCode: 200,
-            body: JSON.stringify({ success: true })
+            body: JSON.stringify({ success: true, playFabId: playFabId })
         };
 
     } catch (error) {
