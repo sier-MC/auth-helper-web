@@ -1,15 +1,12 @@
 // Archivo: netlify/functions/link-playfab-account.js
-// VERSIÓN CORREGIDA
+// VERSIÓN FINAL CON LOGS DE ERROR MEJORADOS
 
-// La forma correcta de importar el SDK de PlayFab en Node.js
 var PlayFab = require('playfab-sdk');
 var PlayFabServer = PlayFab.PlayFabServer;
 
-// Configura tus claves de PlayFab (las coge de Netlify)
 const PLAYFAB_TITLE_ID = process.env.PLAYFAB_TITLE_ID;
 const PLAYFAB_SECRET_KEY = process.env.PLAYFAB_SECRET_KEY;
 
-// La forma correcta de configurar las claves
 PlayFabServer.settings.titleId = PLAYFAB_TITLE_ID;
 PlayFabServer.settings.developerSecretKey = PLAYFAB_SECRET_KEY;
 
@@ -24,7 +21,6 @@ exports.handler = async function(event, context) {
         return { statusCode: 400, body: JSON.stringify({ success: false, error: "Missing serverAuthCode or deviceId." }) };
     }
     
-    // Usamos LoginWithCustomID porque el DeviceID que nos llega del cliente es, en efecto, un CustomID para el servidor.
     const loginRequest = {
         TitleId: PLAYFAB_TITLE_ID,
         CustomId: deviceId, 
@@ -41,7 +37,6 @@ exports.handler = async function(event, context) {
         
         const playFabId = loginResponse.data.PlayFabId;
 
-        // Vincular la cuenta de Google a ese PlayFabID
         const linkRequest = {
             PlayFabId: playFabId,
             ServerAuthCode: serverAuthCode,
@@ -61,6 +56,9 @@ exports.handler = async function(event, context) {
         };
 
     } catch (error) {
+        // ¡¡AÑADIDO IMPORTANTE!! Imprimimos el error completo en el log del servidor
+        console.error("PlayFab API call failed:", JSON.stringify(error, null, 2));
+
         return {
             statusCode: 500,
             body: JSON.stringify({ success: false, error: error.errorMessage || "An unknown server error occurred." })
