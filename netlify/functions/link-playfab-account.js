@@ -1,4 +1,3 @@
-// Archivo: netlify/functions/link-playfab-account.js
 // VERSIÓN FINAL CON LÓGICA INVERTIDA
 
 var PlayFab = require('playfab-sdk');
@@ -40,24 +39,19 @@ exports.handler = async function(event, context) {
         const sessionTicket = loginResponse.data.SessionTicket;
 
         // PASO 2: Vincular el DeviceID a la cuenta maestra recién logueada.
+        // NOTA: LinkAndroidDeviceID es una API de CLIENTE, por lo que necesita ser llamada de forma especial.
         const linkRequest = {
             PlayFabId: playFabId,
             AndroidDeviceId: deviceId,
             ForceLink: true
         };
         
-        // Para esta llamada, necesitamos autenticarnos como el propio jugador
-        // usando el SessionTicket que acabamos de obtener.
-        const customPlayFabClient = {
-            settings: {
-                titleId: PLAYFAB_TITLE_ID
-            },
-            ClientApi: PlayFab.PlayFabClient
-        };
+        // Creamos una instancia temporal del Client API para hacer la llamada con el ticket del jugador
+        const PlayFabClient = PlayFab.PlayFabClient;
         
         await new Promise((resolve, reject) => {
-            customPlayFabClient.ClientApi.LinkAndroidDeviceID(linkRequest, {
-                "X-Authorization": sessionTicket
+            PlayFabClient.LinkAndroidDeviceID(linkRequest, {
+                "X-Authorization": sessionTicket // Autenticamos la llamada como si fuéramos el jugador
             }, (result, error) => {
                 if (error) reject(error);
                 else resolve(result);
