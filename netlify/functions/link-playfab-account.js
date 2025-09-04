@@ -1,65 +1,55 @@
-var PlayFab = require('playfab-sdk');
-var PlayFabClient = PlayFab.PlayFabClient;
+import fetch from "node-fetch";
 
-const PLAYFAB_TITLE_ID = process.env.PLAYFAB_TITLE_ID;
+export async function handler(event, context) {
+  try {
+    const { serverAuthCode, sessionTicket } = JSON.parse(event.body);
 
-PlayFabClient.settings.titleId = PLAYFAB_TITLE_ID;
-
-exports.handler = async function(event, context) {
-    if (event.httpMethod !== 'POST') {
-        return { statusCode: 405, body: 'Method Not Allowed' };
+    if (!serverAuthCode || !sessionTicket) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Missing serverAuthCode or sessionTicket" }),
+      };
     }
 
-    const { serverAuthCode, deviceId } = JSON.parse(event.body);
+    const url = "https://10056D.playfabapi.com/Client/LinkGoogleAccount";
 
-    if (!serverAuthCode || !deviceId) {
-        return { statusCode: 400, body: JSON.stringify({ success: false, error: "Missing serverAuthCode or deviceId." }) };
-    }
+    const body = {
+      ServerAuthCode: serverAuthCode,
+      ForceLink: true,
+    };
 
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Authorization": sessionTicket, // 🔑 muy importante
+      },
+      body: JSON.stringify(body),
+    });
+
+    const text = await response.text(); // 👈 capturamos raw
+    console.log("PlayFab raw response:", response.status, text);
+
+    let data;
     try {
-        // PASO 1: Login con Google (CLIENT API)
-        const googleLoginRequest = {
-            TitleId: PLAYFAB_TITLE_ID,
-            ServerAuthCode: serverAuthCode,
-            CreateAccount: true
-        };
-
-        const loginResponse = await new Promise((resolve, reject) => {
-            PlayFabClient.LoginWithGoogleAccount(googleLoginRequest, (result, error) => {
-                if (error) reject(error);
-                else resolve(result);
-            });
-        });
-
-        const playFabId = loginResponse.data.PlayFabId;
-        const sessionTicket = loginResponse.data.SessionTicket;
-
-        // Guardar el SessionTicket en el cliente SDK
-        PlayFabClient.settings.sessionTicket = sessionTicket;
-
-        // PASO 2: Vincular AndroidDeviceID a esa cuenta
-        const linkRequest = {
-            AndroidDeviceId: deviceId,
-            ForceLink: true
-        };
-
-        await new Promise((resolve, reject) => {
-            PlayFabClient.LinkAndroidDeviceID(linkRequest, (result, error) => {
-                if (error) reject(error);
-                else resolve(result);
-            });
-        });
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ success: true, playFabId })
-        };
-
-    } catch (error) {
-        console.error("PlayFab API call failed:", JSON.stringify(error, null, 2));
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ success: false, error: error.errorMessage || "Unknown error." })
-        };
+      data = JSON.parse(text);
+    } catch (e) {
+      data = { parseError: true, raw: text };
     }
-};
+
+    if (!response.ok) {
+      return {
+        statusCode: response.status,
+        body: JSON.stringify({ error: "PlayFab API call failed", data }),
+      };
+    }
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify(data),
+    };
+  } catch (error) {
+    console.error("Server error:", error);
+    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+  }
+}
