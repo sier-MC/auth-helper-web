@@ -1,0 +1,3 @@
+# Navega a la carpeta donde está tu función
+npm init -y
+npm install cookie
