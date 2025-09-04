@@ -1,3 +1,15 @@
-# Navega a la carpeta donde está tu función
-npm init -y
-npm install cookie
+{
+  "name": "auth-helper-functions",
+  "version": "1.0.0",
+  "description": "Netlify function for Google Sign-In and PlayFab linking",
+  "dependencies": {
+    "cookie": "^0.6.0"
+  },
+  "main": "link-playfab-account.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
