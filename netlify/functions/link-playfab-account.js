@@ -8,6 +8,8 @@ exports.handler = async function(event) {
     }
 
     const { sessionTicket, serverAuthCode } = JSON.parse(event.body);
+console.log("DEBUG raw event.body:", event.body);
+console.log("DEBUG parsed:", JSON.parse(event.body));
 
     if (!sessionTicket || !serverAuthCode) {
         return {
@@ -55,3 +57,4 @@ exports.handler = async function(event) {
         };
     }
 };
+
