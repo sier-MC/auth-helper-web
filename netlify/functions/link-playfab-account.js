@@ -1,55 +1,57 @@
-import fetch from "node-fetch";
+// link-playfab-account.js
 
-export async function handler(event, context) {
-  try {
-    const { serverAuthCode, sessionTicket } = JSON.parse(event.body);
+const PLAYFAB_TITLE_ID = process.env.PLAYFAB_TITLE_ID;
 
-    if (!serverAuthCode || !sessionTicket) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: "Missing serverAuthCode or sessionTicket" }),
-      };
+exports.handler = async function(event) {
+    if (event.httpMethod !== "POST") {
+        return { statusCode: 405, body: "Method Not Allowed" };
     }
 
-    const url = "https://10056D.playfabapi.com/Client/LinkGoogleAccount";
+    const { sessionTicket, serverAuthCode } = JSON.parse(event.body);
 
-    const body = {
-      ServerAuthCode: serverAuthCode,
-      ForceLink: true,
-    };
+    if (!sessionTicket || !serverAuthCode) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify({ error: "Missing sessionTicket or serverAuthCode" })
+        };
+    }
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Authorization": sessionTicket, // 🔑 muy importante
-      },
-      body: JSON.stringify(body),
-    });
-
-    const text = await response.text(); // 👈 capturamos raw
-    console.log("PlayFab raw response:", response.status, text);
-
-    let data;
     try {
-      data = JSON.parse(text);
-    } catch (e) {
-      data = { parseError: true, raw: text };
-    }
+        const response = await fetch(
+            `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Client/LinkGoogleAccount`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Authorization": sessionTicket
+                },
+                body: JSON.stringify({
+                    ServerAuthCode: serverAuthCode,
+                    ForceLink: true
+                })
+            }
+        );
 
-    if (!response.ok) {
-      return {
-        statusCode: response.status,
-        body: JSON.stringify({ error: "PlayFab API call failed", data }),
-      };
-    }
+        const data = await response.json();
+        console.log("LinkGoogleAccount raw response:", data);
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify(data),
-    };
-  } catch (error) {
-    console.error("Server error:", error);
-    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
-  }
-}
+        if (!response.ok) {
+            return {
+                statusCode: response.status,
+                body: JSON.stringify({ success: false, error: data })
+            };
+        }
+
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ success: true, result: data })
+        };
+
+    } catch (err) {
+        console.error("Unexpected error:", err);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ success: false, error: err.message })
+        };
+    }
+};
