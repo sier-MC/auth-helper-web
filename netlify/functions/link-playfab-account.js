@@ -1,25 +1,62 @@
-// link-playfab-account.js
+// netlify/functions/link-playfab-account.js
+
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const PLAYFAB_TITLE_ID = process.env.PLAYFAB_TITLE_ID;
 
-exports.handler = async function(event) {
+exports.handler = async function (event) {
     if (event.httpMethod !== "POST") {
         return { statusCode: 405, body: "Method Not Allowed" };
     }
 
-    const { sessionTicket, serverAuthCode } = JSON.parse(event.body);
-console.log("DEBUG raw event.body:", event.body);
-console.log("DEBUG parsed:", JSON.parse(event.body));
+    let body;
+    try {
+        body = JSON.parse(event.body);
+    } catch (err) {
+        console.error("Invalid JSON body:", event.body);
+        return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON body" }) };
+    }
 
-    if (!sessionTicket || !serverAuthCode) {
+    const { deviceId, serverAuthCode } = body;
+
+    console.log("DEBUG parsed body:", body);
+
+    if (!deviceId || !serverAuthCode) {
         return {
             statusCode: 400,
-            body: JSON.stringify({ error: "Missing sessionTicket or serverAuthCode" })
+            body: JSON.stringify({ error: "Missing deviceId or serverAuthCode" })
         };
     }
 
     try {
-        const response = await fetch(
+        // PASO 1: login con AndroidDeviceID
+        const loginResponse = await fetch(
+            `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Client/LoginWithAndroidDeviceID`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    TitleId: PLAYFAB_TITLE_ID,
+                    AndroidDeviceId: deviceId,
+                    CreateAccount: true
+                })
+            }
+        );
+
+        const loginData = await loginResponse.json();
+        console.log("DEBUG LoginWithAndroidDeviceID response:", loginData);
+
+        if (!loginResponse.ok || !loginData.data?.SessionTicket) {
+            return {
+                statusCode: 500,
+                body: JSON.stringify({ error: "LoginWithAndroidDeviceID failed", details: loginData })
+            };
+        }
+
+        const sessionTicket = loginData.data.SessionTicket;
+
+        // PASO 2: link con Google
+        const linkResponse = await fetch(
             `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Client/LinkGoogleAccount`,
             {
                 method: "POST",
@@ -34,19 +71,19 @@ console.log("DEBUG parsed:", JSON.parse(event.body));
             }
         );
 
-        const data = await response.json();
-        console.log("LinkGoogleAccount raw response:", data);
+        const linkData = await linkResponse.json();
+        console.log("DEBUG LinkGoogleAccount response:", linkData);
 
-        if (!response.ok) {
+        if (!linkResponse.ok) {
             return {
-                statusCode: response.status,
-                body: JSON.stringify({ success: false, error: data })
+                statusCode: linkResponse.status,
+                body: JSON.stringify({ success: false, error: linkData })
             };
         }
 
         return {
             statusCode: 200,
-            body: JSON.stringify({ success: true, result: data })
+            body: JSON.stringify({ success: true, result: linkData })
         };
 
     } catch (err) {
@@ -57,4 +94,3 @@ console.log("DEBUG parsed:", JSON.parse(event.body));
         };
     }
 };
-
