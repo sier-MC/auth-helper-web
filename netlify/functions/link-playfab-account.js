@@ -5,29 +5,45 @@ exports.handler = async function(event) {
         return { statusCode: 405, body: "Method Not Allowed" };
     }
 
-    let body;
-    try {
-        body = JSON.parse(event.body);
-        console.log("DEBUG parsed body:", body);
-    } catch (err) {
-        console.error("Error parsing body:", err);
+    const { deviceId, serverAuthCode } = JSON.parse(event.body);
+    console.log("DEBUG parsed body:", { deviceId, serverAuthCode });
+
+    if (!deviceId || !serverAuthCode) {
         return {
             statusCode: 400,
-            body: JSON.stringify({ error: "Invalid JSON" })
-        };
-    }
-
-    const { sessionTicket, serverAuthCode, deviceId } = body;
-
-    if (!sessionTicket || !serverAuthCode) {
-        return {
-            statusCode: 400,
-            body: JSON.stringify({ error: "Missing sessionTicket or serverAuthCode" })
+            body: JSON.stringify({ error: "Missing deviceId or serverAuthCode" })
         };
     }
 
     try {
-        const response = await fetch(
+        // Paso 1: Login con deviceId
+        const loginResponse = await fetch(
+            `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Client/LoginWithCustomID`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    TitleId: PLAYFAB_TITLE_ID,
+                    CustomId: deviceId,
+                    CreateAccount: true
+                })
+            }
+        );
+
+        const loginData = await loginResponse.json();
+        console.log("DEBUG loginData:", loginData);
+
+        if (!loginResponse.ok || !loginData.data?.SessionTicket) {
+            return {
+                statusCode: 500,
+                body: JSON.stringify({ error: "Failed to login", details: loginData })
+            };
+        }
+
+        const sessionTicket = loginData.data.SessionTicket;
+
+        // Paso 2: Link Google
+        const linkResponse = await fetch(
             `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Client/LinkGoogleAccount`,
             {
                 method: "POST",
@@ -42,19 +58,19 @@ exports.handler = async function(event) {
             }
         );
 
-        const data = await response.json();
-        console.log("LinkGoogleAccount raw response:", data);
+        const linkData = await linkResponse.json();
+        console.log("DEBUG linkData:", linkData);
 
-        if (!response.ok) {
+        if (!linkResponse.ok) {
             return {
-                statusCode: response.status,
-                body: JSON.stringify({ success: false, error: data })
+                statusCode: linkResponse.status,
+                body: JSON.stringify({ success: false, error: linkData })
             };
         }
 
         return {
             statusCode: 200,
-            body: JSON.stringify({ success: true, result: data })
+            body: JSON.stringify({ success: true, result: linkData })
         };
 
     } catch (err) {
