@@ -16,17 +16,20 @@ exports.handler = async function(event) {
     }
 
     try {
-        // Paso 1: Login con deviceId
+        // Paso 1: Login con AndroidDeviceID
+        const loginPayload = {
+            TitleId: PLAYFAB_TITLE_ID,
+            AndroidDeviceId: String(deviceId),
+            CreateAccount: true
+        };
+        console.log("DEBUG loginPayload:", loginPayload);
+
         const loginResponse = await fetch(
-            `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Client/LoginWithCustomID`,
+            `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Client/LoginWithAndroidDeviceID`,
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    TitleId: PLAYFAB_TITLE_ID,
-                    CustomId: deviceId,
-                    CreateAccount: true
-                })
+                body: JSON.stringify(loginPayload)
             }
         );
 
@@ -43,6 +46,12 @@ exports.handler = async function(event) {
         const sessionTicket = loginData.data.SessionTicket;
 
         // Paso 2: Link Google
+        const linkPayload = {
+            ServerAuthCode: serverAuthCode,
+            ForceLink: true
+        };
+        console.log("DEBUG linkPayload:", linkPayload);
+
         const linkResponse = await fetch(
             `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Client/LinkGoogleAccount`,
             {
@@ -51,10 +60,7 @@ exports.handler = async function(event) {
                     "Content-Type": "application/json",
                     "X-Authorization": sessionTicket
                 },
-                body: JSON.stringify({
-                    ServerAuthCode: serverAuthCode,
-                    ForceLink: true
-                })
+                body: JSON.stringify(linkPayload)
             }
         );
 
