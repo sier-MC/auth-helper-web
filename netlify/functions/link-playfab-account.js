@@ -5,7 +5,17 @@ exports.handler = async function(event) {
         return { statusCode: 405, body: "Method Not Allowed" };
     }
 
-    const { deviceId, serverAuthCode } = JSON.parse(event.body);
+    let body;
+    try {
+        body = JSON.parse(event.body);
+    } catch (err) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify({ error: "Invalid JSON" })
+        };
+    }
+    
+    const { deviceId, serverAuthCode } = body;
     console.log("DEBUG parsed body:", { deviceId, serverAuthCode });
 
     if (!deviceId || !serverAuthCode) {
@@ -16,22 +26,24 @@ exports.handler = async function(event) {
     }
 
     try {
-        // Paso 1: Login con AndroidDeviceID
+        // --- CAMBIO AQUI ---
+        // Paso 1: Login con CustomID (usando el deviceId)
         const loginPayload = {
             TitleId: PLAYFAB_TITLE_ID,
-            AndroidDeviceId: String(deviceId),
+            CustomId: String(deviceId),
             CreateAccount: true
         };
         console.log("DEBUG loginPayload:", loginPayload);
 
         const loginResponse = await fetch(
-            `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Client/LoginWithAndroidDeviceID`,
+            `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Client/LoginWithCustomID`,
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(loginPayload)
             }
         );
+        // --- FIN DEL CAMBIO ---
 
         const loginData = await loginResponse.json();
         console.log("DEBUG loginData:", loginData);
