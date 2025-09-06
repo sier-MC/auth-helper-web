@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "Netlify function for Google Sign-In and PlayFab linking",
   "dependencies": {
-    "cookie": "^0.6.0"
+    "axios": "^1.11.0",
+    "cookie": "^0.6.0",
+    "playfab-sdk": "^2.180.250815"
   },
   "main": "link-playfab-account.js",
   "scripts": {
