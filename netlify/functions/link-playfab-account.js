@@ -1,12 +1,12 @@
 // Archivo: netlify/functions/link-playfab-account.js
-const PlayFab = require("playfab-sdk/Scripts/PlayFab/PlayFab.js");
-const PlayFabServer = require("playfab-sdk/Scripts/PlayFab/PlayFabServer.js");
+const PlayFab = require("playfab-sdk");
 
 const PLAYFAB_TITLE_ID = process.env.PLAYFAB_TITLE_ID;
 const PLAYFAB_SECRET_KEY = process.env.PLAYFAB_SECRET_KEY;
 
-PlayFab.PlayFabServer.settings.titleId = PLAYFAB_TITLE_ID;
-PlayFab.PlayFabServer.settings.developerSecretKey = PLAYFAB_SECRET_KEY;
+// Configuración global del SDK
+PlayFab.settings.titleId = PLAYFAB_TITLE_ID;
+PlayFab.settings.developerSecretKey = PLAYFAB_SECRET_KEY;
 
 exports.handler = async function(event, context) {
     console.log("=== Nueva llamada link-playfab-account ===");
@@ -43,7 +43,7 @@ exports.handler = async function(event, context) {
     try {
         console.log("➡️ Haciendo LoginWithCustomID en PlayFab...");
         const loginResponse = await new Promise((resolve, reject) => {
-            PlayFab.PlayFabServer.LoginWithCustomID(loginRequest, (result, error) => {
+            PlayFab.Server.LoginWithCustomID(loginRequest, (error, result) => {
                 if (error) reject(error);
                 else resolve(result);
             });
@@ -60,7 +60,7 @@ exports.handler = async function(event, context) {
 
         console.log("➡️ Vinculando cuenta Google...");
         await new Promise((resolve, reject) => {
-            PlayFab.PlayFabServer.LinkGoogleAccount(linkRequest, (result, error) => {
+            PlayFab.Server.LinkGoogleAccount(linkRequest, (error, result) => {
                 if (error) reject(error);
                 else resolve(result);
             });
