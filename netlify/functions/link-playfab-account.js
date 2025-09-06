@@ -44,7 +44,10 @@ exports.handler = async function(event) {
 
         // PASO 2: Usar el Access Token para hacer login en PlayFab
         console.log("Iniciando sesión en PlayFab con el token de Google...");
-        PlayFab.settings.titleId = PLAYFAB_TITLE_ID;
+        
+        // --- CAMBIO AQUÍ ---
+        // La configuración se aplica al cliente específico del SDK
+        PlayFab.PlayFabClient.settings.titleId = PLAYFAB_TITLE_ID;
 
         const loginRequest = {
             TitleId: PLAYFAB_TITLE_ID,
@@ -53,7 +56,9 @@ exports.handler = async function(event) {
         };
 
         const playfabResponse = await new Promise((resolve, reject) => {
-            PlayFab.Client.LoginWithGoogleAccount(loginRequest, (error, result) => {
+            // --- Y CAMBIO AQUÍ ---
+            // Usamos PlayFab.PlayFabClient en lugar de PlayFab.Client
+            PlayFab.PlayFabClient.LoginWithGoogleAccount(loginRequest, (error, result) => {
                 if (error) return reject(error);
                 resolve(result);
             });
