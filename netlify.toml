@@ -1,5 +1,7 @@
+# Configuración de Build de Netlify
 [build]
+  # Directorio donde se encuentran las funciones serverless
   functions = "netlify/functions"
-
-[[plugins]]
-package = "@netlify/plugin-functions-install-core"
+  
+  # Directorio que Netlify debe publicar como tu sitio web principal
+  publish = "public"
