@@ -15,33 +15,37 @@
             margin: 0;
             text-align: center;
         }
-        h2 {
-            font-weight: normal;
-        }
+        h2 { font-weight: normal; }
     </style>
 </head>
 <body>
     <h2 id="status">Por favor, espera...</h2>
+
+    <!-- SDK de Google Identity -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+
     <script>
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
             const deviceId = urlParams.get('deviceId');
 
             if (!deviceId) {
-                document.getElementById('status').innerText = "Error: Falta el ID del dispositivo.";
+                document.getElementById('status').innerText =
+                    "Error: Falta el ID del dispositivo.";
                 return;
             }
 
-            // Inicializamos el cliente de Google
+            // Cliente OAuth de Google
             const client = google.accounts.oauth2.initCodeClient({
-                client_id: "136831675697-g752dn6minj6b3ippc5c574se1tceuti.apps.googleusercontent.com", // tu Web Client ID
+                client_id: "136831675697-g752dn6minj6b3ippc5c574se1tceuti.apps.googleusercontent.com",
                 scope: "email profile openid",
-                redirect_uri: "https://10056d.playfabapi.com/oauth/google/receive", // 👈 importante
+                // 🚫 Ojo: no ponemos redirect_uri
                 callback: (response) => {
                     if (response.code) {
-                        // Tenemos el código, ahora se lo enviamos a nuestro mini-servidor
-                        document.getElementById('status').innerText = "Verificando con el servidor...";
+                        document.getElementById('status').innerText =
+                            "Verificando con el servidor...";
+
+                        // Mandamos el código y el deviceId a tu función en Netlify
                         fetch('/.netlify/functions/link-playfab-account', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -52,28 +56,35 @@
                         })
                         .then(res => {
                             if (!res.ok) {
-                                return res.json().then(err => { throw new Error(err.error || "Error desconocido del servidor"); });
+                                return res.json()
+                                    .then(err => { throw new Error(err.error || "Error desconocido del servidor") });
                             }
                             return res.json();
                         })
                         .then(data => {
                             if (data.success) {
-                                document.getElementById('status').innerText = "¡Éxito! Tu cuenta ha sido vinculada. Ya puedes cerrar esta ventana y volver al juego.";
+                                document.getElementById('status').innerText =
+                                    "¡Éxito! Tu cuenta ha sido vinculada. Ya puedes cerrar esta ventana y volver al juego.";
                             } else {
-                                document.getElementById('status').innerText = "Error en el servidor: " + (data.error || "Respuesta inesperada.");
+                                document.getElementById('status').innerText =
+                                    "Error en el servidor: " + (data.error || "Respuesta inesperada.");
                             }
                         })
                         .catch(err => {
-                            document.getElementById('status').innerText = "Error de conexión con el servidor: " + err.message;
+                            document.getElementById('status').innerText =
+                                "Error de conexión con el servidor: " + err.message;
                         });
                     } else {
-                        document.getElementById('status').innerText = "El inicio de sesión con Google ha fallado o ha sido cancelado. Puedes cerrar esta ventana.";
+                        document.getElementById('status').innerText =
+                            "El inicio de sesión con Google ha fallado o ha sido cancelado. Puedes cerrar esta ventana.";
                     }
                 }
             });
 
-            // Pedimos el código
-            document.getElementById('status').innerText = "Por favor, inicia sesión con Google para vincular tu cuenta...";
+            document.getElementById('status').innerText =
+                "Por favor, inicia sesión con Google para vincular tu cuenta...";
+
+            // Dispara el prompt de login
             client.requestCode();
         };
     </script>
