@@ -1,89 +1,85 @@
-const cookie = require("cookie");
+// Archivo: netlify/functions/link-playfab-account.js
+const PlayFab = require("playfab-sdk/Scripts/PlayFab/PlayFab.js");
+const PlayFabServer = require("playfab-sdk/Scripts/PlayFab/PlayFabServer.js");
 
-// VARIABLES DE ENTORNO QUE DEBES CONFIGURAR EN NETLIFY
 const PLAYFAB_TITLE_ID = process.env.PLAYFAB_TITLE_ID;
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const REDIRECT_URI = process.env.REDIRECT_URI; // La URL de esta misma función
+const PLAYFAB_SECRET_KEY = process.env.PLAYFAB_SECRET_KEY;
 
-exports.handler = async function(event) {
-    const queryParams = event.queryStringParameters;
+PlayFab.PlayFabServer.settings.titleId = PLAYFAB_TITLE_ID;
+PlayFab.PlayFabServer.settings.developerSecretKey = PLAYFAB_SECRET_KEY;
 
-    // Parte 2: Google nos devuelve al usuario con un código
-    if (queryParams && queryParams.code) {
-        const serverAuthCode = queryParams.code;
-        const cookies = cookie.parse(event.headers.cookie || "");
-        const deviceId = cookies.deviceId;
+exports.handler = async function(event, context) {
+    console.log("=== Nueva llamada link-playfab-account ===");
 
-        if (!deviceId) {
-            return {
-                statusCode: 400,
-                headers: { 'Content-Type': 'text/html; charset=utf-8' },
-                body: "<h1>Error</h1><p>No se encontró el ID del dispositivo. Por favor, intenta el proceso de nuevo desde el juego.</p>"
-            };
-        }
-
-        try {
-            // Login en PlayFab con el deviceId
-            const loginResponse = await fetch(`https://${PLAYFAB_TITLE_ID}.playfabapi.com/Client/LoginWithCustomID`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ TitleId: PLAYFAB_TITLE_ID, CustomId: deviceId, CreateAccount: true })
-            });
-            const loginData = await loginResponse.json();
-            if (!loginResponse.ok) throw new Error(`Error en el login de PlayFab: ${JSON.stringify(loginData)}`);
-            
-            const sessionTicket = loginData.data.SessionTicket;
-
-            // Vincular la cuenta de Google
-            const linkResponse = await fetch(`https://${PLAYFAB_TITLE_ID}.playfabapi.com/Client/LinkGoogleAccount`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "X-Authorization": sessionTicket },
-                body: JSON.stringify({ ServerAuthCode: serverAuthCode, ForceLink: true })
-            });
-            const linkData = await linkResponse.json();
-            if (!linkResponse.ok) throw new Error(`Error al vincular la cuenta de Google: ${JSON.stringify(linkData)}`);
-
-            // Mostrar página de éxito
-            return {
-                statusCode: 200,
-                headers: { 'Content-Type': 'text/html; charset=utf-8' },
-                body: "<h1>¡Éxito!</h1><p>Tu cuenta ha sido vinculada correctamente. Ya puedes cerrar esta ventana.</p>"
-            };
-
-        } catch (err) {
-            console.error("Error en el proceso de vinculación:", err);
-            return {
-                statusCode: 500,
-                headers: { 'Content-Type': 'text/html; charset=utf-8' },
-                body: `<h1>Error</h1><p>Ocurrió un problema en el servidor: ${err.message}</p>`
-            };
-        }
+    if (event.httpMethod !== 'POST') {
+        console.log("Método inválido:", event.httpMethod);
+        return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
-    // Parte 1: El usuario llega desde el juego
-    const deviceId = queryParams ? queryParams.deviceId : null;
-    if (!deviceId) {
+    let serverAuthCode, deviceId;
+    try {
+        ({ serverAuthCode, deviceId } = JSON.parse(event.body));
+    } catch (err) {
+        console.error("Error parseando body:", err);
+        return { statusCode: 400, body: JSON.stringify({ success: false, error: "Invalid JSON" }) };
+    }
+
+    console.log("Body recibido:", { serverAuthCode, deviceId });
+
+    if (!serverAuthCode || !deviceId) {
+        console.error("Faltan parámetros");
         return {
             statusCode: 400,
-            headers: { 'Content-Type': 'text/html; charset=utf-8' },
-            body: "<h1>Error</h1><p>Falta el parámetro 'deviceId' en la URL.</p>"
+            body: JSON.stringify({ success: false, error: "Missing serverAuthCode or deviceId." })
         };
     }
 
-    // Guardamos el deviceId en una cookie y redirigimos a Google
-    const deviceIdCookie = cookie.serialize("deviceId", deviceId, {
-        httpOnly: true, path: "/", maxAge: 60 * 5 // 5 minutos
-    });
-
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-        `client_id=${GOOGLE_CLIENT_ID}` +
-        `&redirect_uri=${REDIRECT_URI}` +
-        `&response_type=code` +
-        `&scope=email profile` +
-        `&access_type=offline`;
-
-    return {
-        statusCode: 302, // Redirección
-        headers: { "Location": googleAuthUrl, "Set-Cookie": deviceIdCookie }
+    const loginRequest = {
+        TitleId: PLAYFAB_TITLE_ID,
+        CustomId: deviceId,
+        CreateAccount: true
     };
+
+    try {
+        console.log("➡️ Haciendo LoginWithCustomID en PlayFab...");
+        const loginResponse = await new Promise((resolve, reject) => {
+            PlayFab.PlayFabServer.LoginWithCustomID(loginRequest, (result, error) => {
+                if (error) reject(error);
+                else resolve(result);
+            });
+        });
+
+        console.log("✅ Login OK:", loginResponse.data.PlayFabId);
+        const playFabId = loginResponse.data.PlayFabId;
+
+        const linkRequest = {
+            PlayFabId: playFabId,
+            ServerAuthCode: serverAuthCode,
+            ForceLink: true
+        };
+
+        console.log("➡️ Vinculando cuenta Google...");
+        await new Promise((resolve, reject) => {
+            PlayFab.PlayFabServer.LinkGoogleAccount(linkRequest, (result, error) => {
+                if (error) reject(error);
+                else resolve(result);
+            });
+        });
+
+        console.log("✅ Vinculación exitosa!");
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ success: true })
+        };
+
+    } catch (error) {
+        console.error("❌ Error en el proceso:", error);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({
+                success: false,
+                error: error.errorMessage || JSON.stringify(error) || "An unknown error occurred."
+            })
+        };
+    }
 };
