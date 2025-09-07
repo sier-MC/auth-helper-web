@@ -12,7 +12,6 @@ exports.handler = async function(event) {
 
     // --- Parte 2: Google nos devuelve con un código y el 'state' ---
     if (queryParams && queryParams.code) {
-        // Recuperamos el deviceId Y la plataforma del parámetro 'state'
         let stateData;
         try {
             stateData = JSON.parse(decodeURIComponent(queryParams.state));
@@ -31,7 +30,7 @@ exports.handler = async function(event) {
             return {
                 statusCode: 400,
                 headers: { 'Content-Type': 'text/html; charset=utf-8' },
-                body: "<h1>Error</h1><p>No se encontró el ID del dispositivo o la plataforma (state). El proceso no puede continuar.</p>"
+                body: "<h1>Error</h1><p>No se encontró el ID del dispositivo o la plataforma (state).</p>"
             };
         }
 
@@ -71,7 +70,7 @@ exports.handler = async function(event) {
             const playFabId = playfabResponse.data.PlayFabId;
             console.log("Login con Google OK. PlayFabID:", playFabId);
 
-            // PASO C: Vincular el deviceId a la cuenta recién creada/logueada
+            // PASO C: Vincular el deviceId a la cuenta
             console.log(`Vinculando deviceId (${deviceId}) en plataforma (${platform}) a la cuenta ${playFabId}...`);
             
             let linkRequest = { SessionTicket: sessionTicket, ForceLink: true };
@@ -81,10 +80,9 @@ exports.handler = async function(event) {
                 linkRequest.AndroidDeviceId = deviceId;
                 linkApiCall = PlayFab.PlayFabClient.LinkAndroidDeviceID;
             } else if (platform === 'ios') {
-                linkRequest.IOSDeviceId = deviceId; // Nota: el campo es IOSDeviceId para iOS
+                linkRequest.IOSDeviceId = deviceId;
                 linkApiCall = PlayFab.PlayFabClient.LinkIOSDeviceID;
             } else {
-                // Opción por defecto si la plataforma no es android o ios
                 linkRequest.CustomId = deviceId;
                 linkApiCall = PlayFab.PlayFabClient.LinkCustomID;
             }
@@ -97,11 +95,81 @@ exports.handler = async function(event) {
             });
             console.log("¡Éxito! DeviceId vinculado correctamente.");
             
-            // PASO D: Devolver una página de éxito
+            // PASO D: Devolver la página de éxito personalizada con tu banner
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'text/html; charset=utf-8' },
-                body: `<h1>¡Éxito Total!</h1><p>Has iniciado sesión y tu dispositivo ha sido vinculado.</p><p>PlayFabID: ${playFabId}</p><p>Ya puedes cerrar esta ventana.</p>`
+                body: `
+                    <!DOCTYPE html>
+                    <html lang="es">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>¡Conexión Exitosa!</title>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <style>
+                            @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+                            body {
+                                font-family: 'Poppins', sans-serif;
+                                background-color: #1a202c;
+                                color: #e2e8f0;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                height: 100vh;
+                                margin: 0;
+                                text-align: center;
+                            }
+                            .container {
+                                background-color: #2d3748;
+                                padding: 2rem 3rem;
+                                border-radius: 15px;
+                                box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+                                max-width: 400px;
+                            }
+                            .logo {
+                                max-width: 250px; /* Ajusta el tamaño si es necesario */
+                                margin-bottom: 1.5rem;
+                                border-radius: 8px; /* Opcional: para redondear las esquinas del banner */
+                            }
+                            h1 {
+                                color: #48bb78;
+                                font-weight: 600;
+                                font-size: 1.75rem;
+                            }
+                            p {
+                                font-size: 1rem;
+                                color: #a0aec0;
+                            }
+                            .close-btn {
+                                background-color: #4299e1;
+                                color: white;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 8px;
+                                font-size: 1rem;
+                                font-weight: 600;
+                                cursor: pointer;
+                                margin-top: 1.5rem;
+                                transition: background-color 0.3s;
+                            }
+                            .close-btn:hover {
+                                background-color: #3182ce;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <img src="https://images.squarespace-cdn.com/content/v1/6722596d6d102f527f601083/89246877-f53e-4439-8162-a5d2dbd58a7d/Starships%26Puzzles+Banner?format=2500w" alt="Banner del Juego" class="logo">
+                            <h1>¡Todo Listo!</h1>
+                            <p>Tu cuenta ha sido conectada correctamente. Ya puedes volver al juego.</p>
+                            <button class="close-btn" onclick="window.close()">Cerrar Ventana</button>
+                        </div>
+                        <script>
+                            setTimeout(() => { window.close(); }, 4000);
+                        </script>
+                    </body>
+                    </html>
+                `
             };
 
         } catch (err) {
@@ -117,7 +185,7 @@ exports.handler = async function(event) {
 
     // --- Parte 1: El usuario llega desde el juego ---
     const deviceId = queryParams ? queryParams.deviceId : null;
-    const platform = queryParams ? queryParams.platform : 'custom'; // 'custom' como valor por defecto
+    const platform = queryParams ? queryParams.platform : 'custom';
 
     if (!deviceId) {
         return {
@@ -134,12 +202,11 @@ exports.handler = async function(event) {
     authUrl.searchParams.append('scope', 'email profile');
     authUrl.searchParams.append('access_type', 'offline');
     
-    // Guardamos el deviceId y la plataforma en el parámetro 'state'
     const stateObject = { deviceId, platform };
     authUrl.searchParams.append('state', encodeURIComponent(JSON.stringify(stateObject)));
     
     return {
-        statusCode: 302, // Redirección
+        statusCode: 302,
         headers: { "Location": authUrl.toString() }
     };
 };
