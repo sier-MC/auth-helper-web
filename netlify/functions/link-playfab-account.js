@@ -12,7 +12,7 @@ const translations = {
     es: {
         successTitle: "¡Conexión Exitosa!",
         successHeader: "¡Todo Listo!",
-        successMessage: "Esta ventana intentará cerrarse en 3 segundos. Si no, puedes cerrarla manually y volver al juego.",
+        successMessage: "Esta ventana intentará cerrarse en 3 segundos. Si no, puedes cerrarla manualmente y volver al juego.",
         errorHeader: "Error",
         errorMessage: "Ocurrió un problema en el servidor:",
         errorState: "El parámetro 'state' es inválido.",
@@ -34,10 +34,9 @@ const translations = {
 exports.handler = async function(event) {
     const queryParams = event.queryStringParameters;
     
-    // --- LÓGICA DE IDIOMA CORREGIDA ---
-    const langHeader = event.headers['accept-language'] || 'en';
-    const firstLang = langHeader.split(',')[0].toLowerCase(); // Tomamos el primer idioma de la lista (ej: "en" o "es-es")
-    const lang = firstLang.startsWith('es') ? 'es' : 'en'; // Comprobamos si es español
+    // --- LÓGICA DE IDIOMA CORREGIDA Y DEFINITIVA ---
+    const lang = event.headers['accept-language']?.includes('es') ? 'es' : 'en';
+    // ---------------------------------------------
     const t = { ...translations.en, ...translations[lang] };
 
     // --- Parte 2: Google nos devuelve con un código y el 'state' ---
@@ -130,7 +129,7 @@ exports.handler = async function(event) {
 
         } catch (err) {
             const errorDetails = err.response ? err.response.data : (err.errorMessage || err.message);
-            console.error("Error en el proceso:", err);
+            console.error("Error en el proceso:", errorDetails);
             return {
                 statusCode: 500,
                 headers: { 'Content-Type': 'text/html; charset=utf-8' },
