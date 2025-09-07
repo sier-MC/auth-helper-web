@@ -34,9 +34,13 @@ const translations = {
 exports.handler = async function(event) {
     const queryParams = event.queryStringParameters;
     
-    // --- LÓGICA DE IDIOMA CORREGIDA Y DEFINITIVA ---
-    const lang = event.headers['accept-language']?.includes('es') ? 'es' : 'en';
-    // ---------------------------------------------
+    // --- LÓGICA DE IDIOMA DEFINITIVA ---
+    const langHeader = event.headers['accept-language'] || 'en';
+    // Tomamos solo el primer idioma de la lista (ej: "en" o "es-es")
+    const firstLang = langHeader.split(',')[0].toLowerCase();
+    // Comprobamos si ESE PRIMERO es español
+    const lang = firstLang.startsWith('es') ? 'es' : 'en';
+    // ------------------------------------
     const t = { ...translations.en, ...translations[lang] };
 
     // --- Parte 2: Google nos devuelve con un código y el 'state' ---
